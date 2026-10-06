@@ -1,0 +1,11 @@
+[Unit]
+Description=PolyWork Freelance Radar
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+User=CHANGE_ME
+WorkingDirectory=/opt/polywork
+EnvironmentFile=/opt/polywork/.env
+ExecStart=/opt/polywork/.venv/bin/python /opt/polywork/app.py
