@@ -1,0 +1,11 @@
+[Unit]
+Description=Run PolyWork Freelance Radar every 20 minutes
+
+[Timer]
+OnBootSec=2min
+OnUnitActiveSec=20min
+Persistent=true
+Unit=polywork-radar.service
+
+[Install]
+WantedBy=timers.target
