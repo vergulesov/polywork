@@ -34,7 +34,7 @@ def existing_urls(ws=None):
 def append_project(project, ws=None):
     ws = ws or _worksheet()
     row = [
-        datetime.now().strftime("%d.%m.%Y"),
+        datetime.now().strftime("%d.%m.%Y %H:%M"),
         project.get("source", ""),
         project.get("title", ""),
         "",
