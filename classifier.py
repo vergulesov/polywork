@@ -36,4 +36,19 @@ def classify(p):
     h=max(float(data.get('human_time_hours') or 0),0)
     b=max(float(data.get('budget_rub') or 0),0)
     data['effective_rub_per_h']=round(b/h) if b and h else 0
+    raw_status=str(data.get('status','')).strip()
+    if raw_status == 'TOP':
+        data['status']='TOP'
+    elif raw_status == 'Не подходит':
+        data['status']='Не подходит'
+    elif raw_status == 'Проверить':
+        data['status']='Проверить'
+    elif 'Не подходит' in raw_status:
+        data['status']='Не подходит'
+    elif 'TOP' in raw_status and 'Проверить' in raw_status:
+        data['status']='Проверить'
+    elif 'TOP' in raw_status:
+        data['status']='TOP'
+    else:
+        data['status']='Проверить'
     return data
