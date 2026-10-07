@@ -24,7 +24,7 @@ def main():
     init_db()
 
     if args.test_notify:
-        print('testing GigaChat -> Telegram...')
+        print('testing GigaChat -> notifier...')
         verdict=classify(TEST_PROJECT)
         print('verdict:', verdict.get('status'), verdict.get('effective_rub_per_h'))
         send(TEST_PROJECT, verdict)
