@@ -7,11 +7,30 @@ from storage import init_db, is_seen, mark_seen
 
 load_dotenv()
 
+TEST_PROJECT = {
+    "source": "TEST",
+    "external_id": "test-notify",
+    "title": "Загрузить 120 товаров из Excel в OpenCart",
+    "url": "https://example.com/polywork-test",
+    "description": "Есть готовый Excel на 120 товаров: название, артикул, цена, остаток, категория, описание и ссылки на изображения. Нужно загрузить товары в OpenCart, сохранить категории и проверить результат. Созвоны не нужны, срок 2 дня.",
+    "budget": "5000 ₽",
+}
+
 def main():
     ap=argparse.ArgumentParser()
     ap.add_argument('--seed',action='store_true')
+    ap.add_argument('--test-notify',action='store_true')
     args=ap.parse_args()
     init_db()
+
+    if args.test_notify:
+        print('testing GigaChat -> Telegram...')
+        verdict=classify(TEST_PROJECT)
+        print('verdict:', verdict.get('status'), verdict.get('effective_rub_per_h'))
+        send(TEST_PROJECT, verdict)
+        print('test notification sent')
+        return
+
     projects=collect()
     print('collected',len(projects))
     if args.seed:
