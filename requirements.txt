@@ -1,4 +1,4 @@
-requests>=2.32
+requests[socks]>=2.32
 beautifulsoup4>=4.12
 python-dotenv>=1.0
 gspread>=6.1
