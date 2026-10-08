@@ -1,0 +1,110 @@
+[
+  {
+    "name": "документооборот",
+    "text": "специалист по документообороту",
+    "params": {
+      "order_by": "publication_time",
+      "search_period": "3",
+      "schedule": "remote"
+    }
+  },
+  {
+    "name": "первичные документы",
+    "text": "первичная документация",
+    "params": {
+      "order_by": "publication_time",
+      "search_period": "3",
+      "schedule": "remote"
+    }
+  },
+  {
+    "name": "делопроизводство",
+    "text": "делопроизводитель",
+    "params": {
+      "order_by": "publication_time",
+      "search_period": "3",
+      "schedule": "remote"
+    }
+  },
+  {
+    "name": "работа с документами",
+    "text": "специалист по работе с документами",
+    "params": {
+      "order_by": "publication_time",
+      "search_period": "3",
+      "schedule": "remote"
+    }
+  },
+  {
+    "name": "реестры",
+    "text": "ведение реестров",
+    "params": {
+      "order_by": "publication_time",
+      "search_period": "3",
+      "schedule": "remote"
+    }
+  },
+  {
+    "name": "ввод данных",
+    "text": "оператор ввода данных",
+    "params": {
+      "order_by": "publication_time",
+      "search_period": "3",
+      "schedule": "remote"
+    }
+  },
+  {
+    "name": "обработка данных",
+    "text": "специалист по обработке данных",
+    "params": {
+      "order_by": "publication_time",
+      "search_period": "3",
+      "schedule": "remote"
+    }
+  },
+  {
+    "name": "Excel таблицы",
+    "text": "Excel таблицы",
+    "params": {
+      "order_by": "publication_time",
+      "search_period": "3",
+      "schedule": "remote"
+    }
+  },
+  {
+    "name": "отчётность",
+    "text": "специалист по отчетности",
+    "params": {
+      "order_by": "publication_time",
+      "search_period": "3",
+      "schedule": "remote"
+    }
+  },
+  {
+    "name": "оператор CRM",
+    "text": "оператор CRM",
+    "params": {
+      "order_by": "publication_time",
+      "search_period": "3",
+      "schedule": "remote"
+    }
+  },
+  {
+    "name": "помощник бухгалтера",
+    "text": "помощник бухгалтера",
+    "params": {
+      "order_by": "publication_time",
+      "search_period": "3",
+      "schedule": "remote"
+    }
+  },
+  {
+    "name": "контент CMS",
+    "text": "наполнение сайта",
+    "params": {
+      "order_by": "publication_time",
+      "search_period": "3",
+      "schedule": "remote"
+    }
+  }
+]
