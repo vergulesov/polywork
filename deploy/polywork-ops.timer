@@ -1,0 +1,11 @@
+[Unit]
+Description=Collect PolyWork OPS vacancies hourly
+
+[Timer]
+OnBootSec=3min
+OnUnitActiveSec=1h
+Persistent=true
+Unit=polywork-ops.service
+
+[Install]
+WantedBy=timers.target
