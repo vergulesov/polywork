@@ -84,13 +84,13 @@ def make_row(item, vid, qname, d):
     if not employer:
         m = re.search(r"Вакансия компании:\s*(.+?)(?:\s+Создана:|$)", desc)
         employer = m.group(1) if m else ""
-    row = [""] * 27
+    row = [""] * 33
     row[0], row[1], row[2] = now(), employer, d.get("name") or clean(item.findtext("title"))
     row[3], row[4] = f"https://hh.ru/vacancy/{vid}", salary(d)
     row[5], row[6], row[7], row[8] = name(d.get("work_format")), name(d.get("schedule")), name(d.get("employment")), name(d.get("experience"))
     row[13], row[14], row[17], row[18] = "Не проверена", "Запрос: " + qname, vid, "RAW"
-    row[21], row[22], row[23], row[24] = "HH", d.get("published_at") or clean(item.findtext("pubDate")), now(), full
-    row[25], row[26] = "Неизвестно", "Неизвестно"
+    row[27], row[28], row[29], row[30] = "HH", d.get("published_at") or clean(item.findtext("pubDate")), now(), full
+    row[31], row[32] = "Неизвестно", "Неизвестно"
     return row
 
 
@@ -100,14 +100,14 @@ def main():
     ws = gspread.service_account(filename=CREDS).open_by_key(SPREADSHEET_ID).worksheet("RAW")
     if ws.row_values(1)[:21] != BASE_HEADERS:
         raise RuntimeError("Unexpected PolyWork RAW headers; refusing to write")
-    if ws.col_count < 27:
-        ws.add_cols(27 - ws.col_count)
-    extras = ws.get("V1:AA1")
+    if ws.col_count < 33:
+        ws.add_cols(33 - ws.col_count)
+    extras = ws.get("AB1:AG1")
     current = extras[0] if extras else []
     if any(v and v != EXTRA_HEADERS[i] for i, v in enumerate(current)):
-        raise RuntimeError("Existing columns V:AA differ; refusing to overwrite")
+        raise RuntimeError("Existing columns AB:AG differ; refusing to overwrite")
     if current != EXTRA_HEADERS:
-        ws.update(range_name="V1:AA1", values=[EXTRA_HEADERS])
+        ws.update(range_name="AB1:AG1", values=[EXTRA_HEADERS])
 
     sheet_ids = {str(x).strip() for x in ws.col_values(18)[1:] if str(x).strip().isdigit()}
     queries = json.loads(QUERIES.read_text(encoding="utf-8"))
