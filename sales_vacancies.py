@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Sales vacancies pipeline. Independent of PolyWork freelance collectors.
+"""Sales vacancies pipeline using existing HH RSS only. Independent of PolyWork.
 
 Default: read-only dry run. --write explicitly updates dedicated SALES_* tabs.
 Required: requests, gspread, service-account JSON and SPREADSHEET_ID.
@@ -14,11 +14,13 @@ import time
 from pathlib import Path
 
 import requests
+import xml.etree.ElementTree as ET
+from urllib.parse import urlencode
 
 HERE = Path(__file__).resolve().parent
 DB = Path(os.getenv("SALES_DB_PATH", HERE / "data" / "sales_v2.sqlite3"))
 CONFIG = Path(os.getenv("SALES_QUERIES_PATH", HERE / "sales_queries.json"))
-API = "https://api.hh.ru"
+RSS = "https://hh.ru/search/vacancy/rss"
 HEADERS = {"User-Agent": "SalesVacanciesResearch/1.0 (personal job search)"}
 STOP_TITLE = re.compile(r"охранник|курьер|комплектовщик|кладовщик|грузчик|водитель|кассир|продавец-консультант|оператор колл|риелтор|недвижимост|маркетплейс|wildberries|ozon|edtech", re.I)
 TARGET_TITLE = re.compile(r"продаж|клиент|аккаунт|account|проект|оборудован|комплектац|инженер|снабжен", re.I)
@@ -88,45 +90,68 @@ def score(v, text, fmt, sal):
     return total, parts, stop
 
 
-def request_json(session, url, params=None):
-    for attempt in range(3):
-        try:
-            r = session.get(url, params=params, timeout=25)
-            if r.status_code in (429, 500, 502, 503, 504) and attempt < 2:
-                time.sleep(2 ** attempt + 1)
-                continue
-            r.raise_for_status()
-            return r.json()
-        except requests.RequestException:
-            if attempt == 2:
-                raise
-            time.sleep(2 ** attempt + 1)
-
-
 def fetch_vacancies(session, queries, days, pages):
-    out = {}
-    errors = []
+    """HH RSS only. No api.hh.ru calls. RSS can be truncated; report request errors."""
+    out, errors = {}, []
     for q in queries:
         for mode in ("remote", "chelyabinsk"):
-            params = {"text": q, "search_period": days, "order_by": "publication_time",
-                      "per_page": 100, "area": 113 if mode == "remote" else 104}
+            params = {"text": q, "search_period": days,
+                      "order_by": "publication_time",
+                      "area": 113 if mode == "remote" else 104}
             if mode == "remote":
                 params["work_format"] = "REMOTE"
             for page in range(pages):
                 try:
-                    resp = request_json(session, API + "/vacancies", {**params, "page": page})
+                    r = session.get(RSS, params={**params, "page": page}, timeout=20)
+                    r.raise_for_status()
+                    root = ET.fromstring(r.content)
+                    items = root.findall(".//item")
+                    for item in items:
+                        link = clean_html(item.findtext("link") or item.findtext("guid"))
+                        match = re.search(r"/vacancy/(\\d+)", link)
+                        if not match:
+                            continue
+                        vid = match.group(1)
+                        desc = clean_html(item.findtext("description"))
+                        entry = {
+                            "id": vid, "name": clean_html(item.findtext("title")),
+                            "description": desc, "published_at": clean_html(item.findtext("pubDate")),
+                            "alternate_url": f"https://hh.ru/vacancy/{vid}",
+                            "mode": mode, "query": q
+                        }
+                        if vid not in out or mode == "remote":
+                            out[vid] = entry
+                    if not items:
+                        break
                 except Exception as exc:
                     errors.append(f"{q} / {mode} / page {page}: {exc}")
                     break
-                for item in resp.get("items", []):
-                    vid = str(item.get("id") or "")
-                    if vid:
-                        previous = out.get(vid)
-                        if previous is None or mode == "remote":
-                            out[vid] = (item, mode, q)
-                if page + 1 >= resp.get("pages", 0):
-                    break
     return out, errors
+
+
+def rss_salary(desc):
+    m = re.search(r"Предполагаемый уровень месячного дохода:\\s*(.*?)(?=\\s+(?:Регион:|Создана:|Вакансия компании:)|$)", desc, re.I)
+    if not m:
+        return None
+    txt = m.group(1)
+    amounts = [int(x.replace(" ", "").replace("\\xa0", ""))
+               for x in re.findall(r"\\d[\\d \\xa0]*", txt)
+               if int(x.replace(" ", "").replace("\\xa0", "")) >= 1000]
+    if not amounts or ("руб" not in txt.lower() and "₽" not in txt):
+        return None
+    if re.search(r"\\bдо\\b", txt, re.I) and not re.search(r"\\bот\\b", txt, re.I):
+        return {"from": None, "to": max(amounts), "currency": "RUR"}
+    return {"from": min(amounts), "to": max(amounts) if len(amounts) > 1 else None, "currency": "RUR"}
+
+
+def rss_company(desc):
+    m = re.search(r"Вакансия компании:\\s*(.*?)(?=\\s+(?:Создана:|Регион:|Предполагаемый уровень)|$)", desc)
+    return m.group(1).strip() if m else ""
+
+
+def rss_region(desc):
+    m = re.search(r"Регион:\\s*(.*?)(?=\\s+(?:Предполагаемый уровень|Вакансия компании:|Создана:)|$)", desc)
+    return m.group(1).strip() if m else ""
 
 
 def database():
@@ -189,35 +214,39 @@ def main():
     session.headers.update(HEADERS)
     found, errors = fetch_vacancies(session, queries, args.days, args.pages)
     output = []
-    for vid, (item, mode, query) in found.items():
-        if STOP_TITLE.search(item.get("name") or "") or not TARGET_TITLE.search(item.get("name") or ""):
+    for vid, item in found.items():
+        title = item["name"]
+        if STOP_TITLE.search(title) or not TARGET_TITLE.search(title):
             continue
         if args.limit and len(output) >= args.limit:
             break
-        try:
-            full = request_json(session, API + "/vacancies/" + vid)
-        except Exception as exc:
-            errors.append(f"detail {vid}: {exc}")
-            continue
-        fmt = location_fit(full, mode)
-        sal = salary_fit(full.get("salary"))
-        if fmt not in ("REMOTE", "CHELYABINSK") or sal == "FAIL":
-            continue
-        txt = clean_html((full.get("description") or ""))
-        points, parts, stops = score(full, txt, fmt, sal)
-        if stops:
-            continue
-        # Strict RAW: salary must be confirmed. Unknowns are not silently approved.
+        desc = item["description"]
+        sal_data = rss_salary(desc)
+        sal = salary_fit(sal_data)
         if sal != "PASS":
             continue
+        region = rss_region(desc)
+        # Remote is inferred from HH's work_format=REMOTE search result,
+        # NOT independently confirmed from a detailed vacancy card.
+        if item["mode"] == "remote":
+            fmt = "REMOTE_SEARCH"
+        else:
+            if "челябинск" not in region.lower():
+                continue
+            fmt = "CHELYABINSK"
+        # Re-use scoring with confirmed query location represented as temporary category.
+        points, parts, stops = score({"name": title}, desc,
+                                     "REMOTE" if fmt == "REMOTE_SEARCH" else fmt, sal)
+        if stops:
+            continue
         output.append({
-            "hh_id": vid, "found_at": stamp(), "published": full.get("published_at", ""),
-            "title": full.get("name", ""), "company": (full.get("employer") or {}).get("name", ""),
-            "salary": money(full.get("salary")), "format": fmt, "score": points,
-            "breakdown": parts, "stops": stops, "url": full.get("alternate_url") or f"https://hh.ru/vacancy/{vid}",
-            "query": query,
+            "hh_id": vid, "found_at": stamp(), "published": item["published_at"],
+            "title": title, "company": rss_company(desc),
+            "salary": money(sal_data), "format": fmt, "score": points,
+            "breakdown": parts, "stops": stops, "url": item["alternate_url"],
+            "query": item["query"],
         })
-    output.sort(key=lambda x: (-x["score"], x["published"]), reverse=False)
+    output.sort(key=lambda x: (-x["score"], x["published"]))
     print(json.dumps({"found_unique": len(found), "qualified_raw": len(output),
                       "candidates_70": sum(x["score"] >= 70 for x in output),
                       "errors": errors[:30], "sample": output[:20]}, ensure_ascii=False, indent=2))
