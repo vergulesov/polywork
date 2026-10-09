@@ -174,7 +174,7 @@ def worksheets():
     titles = ("SALES_RAW_V2", "SALES_CANDIDATES", "SALES_APPLY")
     headers = {
         titles[0]: ["HH ID", "Найдена UTC", "Опубликована", "Вакансия", "Компания",
-                    "Зарплата", "Формат", "Оценка", "Причина", "Стоп", "Ссылка", "Запрос", "Статус"],
+                    "Зарплата", "Формат", "Оценка", "Причина", "Стоп", "Ссылка", "Запрос", "Статус", "RSS описание", "Статус зарплаты"],
         titles[1]: ["HH ID", "Найдена UTC", "Вакансия", "Компания", "Зарплата", "Формат",
                     "Оценка", "Аргументы", "Ссылка", "Решение ✅/❌"],
         titles[2]: ["HH ID", "Вакансия", "Компания", "Зарплата", "Оценка",
@@ -205,7 +205,7 @@ def main():
     p.add_argument("--write", action="store_true", help="write dedicated SALES_* tabs and state DB")
     p.add_argument("--raw-only", action="store_true", help="populate only SALES_RAW_V2; postpone ranking decisions")
     p.add_argument("--days", type=int, default=3)
-    p.add_argument("--pages", type=int, default=2, help="pages per query and mode, max 20")
+    p.add_argument("--pages", type=int, default=8, help="max RSS pages per query and mode, 1..20")
     p.add_argument("--limit", type=int, default=0, help="limit full-card retrieval (0 = unlimited)")
     args = p.parse_args()
     if args.limit < 0:
@@ -217,17 +217,23 @@ def main():
     session.headers.update(HEADERS)
     found, errors = fetch_vacancies(session, queries, args.days, args.pages)
     output = []
+    drop = {"title": 0, "low_salary": 0, "region": 0, "hard_stop": 0}
+    unknown_pay = 0
     for vid, item in found.items():
         title = item["name"]
         if STOP_TITLE.search(title) or not TARGET_TITLE.search(title):
+            drop["title"] += 1
             continue
         if args.limit and len(output) >= args.limit:
             break
         desc = item["description"]
         sal_data = rss_salary(desc)
         sal = salary_fit(sal_data)
-        if sal != "PASS":
+        if sal == "FAIL":
+            drop["low_salary"] += 1
             continue
+        if sal == "UNKNOWN":
+            unknown_pay += 1
         region = rss_region(desc)
         # Remote is inferred from HH's work_format=REMOTE search result,
         # NOT independently confirmed from a detailed vacancy card.
@@ -235,23 +241,26 @@ def main():
             fmt = "REMOTE_SEARCH"
         else:
             if "челябинск" not in region.lower():
+                drop["region"] += 1
                 continue
             fmt = "CHELYABINSK"
         # Re-use scoring with confirmed query location represented as temporary category.
         points, parts, stops = score({"name": title}, desc,
                                      "REMOTE" if fmt == "REMOTE_SEARCH" else fmt, sal)
         if stops:
+            drop["hard_stop"] += 1
             continue
         output.append({
             "hh_id": vid, "found_at": stamp(), "published": item["published_at"],
             "title": title, "company": rss_company(desc),
             "salary": money(sal_data), "format": fmt, "score": points,
             "breakdown": parts, "stops": stops, "url": item["alternate_url"],
-            "query": item["query"],
+            "query": item["query"], "description": desc, "salary_status": sal,
         })
     output.sort(key=lambda x: (-x["score"], x["published"]))
     print(json.dumps({"found_unique": len(found), "qualified_raw": len(output),
                       "candidates_70": sum(x["score"] >= 70 for x in output),
+                      "unknown_salary": unknown_pay, "discarded": drop,
                       "errors": errors[:30], "sample": output[:5] if args.write else output[:20]}, ensure_ascii=False, indent=2))
     if not args.write:
         print("DRY RUN: no database or spreadsheet changes.")
@@ -278,8 +287,8 @@ def main():
         if vid not in existing:
             raw_new.append([vid, v["found_at"], v["published"], v["title"], v["company"],
                             v["salary"], v["format"], v["score"], json.dumps(v["breakdown"], ensure_ascii=False),
-                            "", v["url"], v["query"], "QUALIFIED"])
-        if not args.raw_only and v["score"] >= 70 and vid not in reviews and vid not in decisions:
+                            "", v["url"], v["query"], "NEEDS_REVIEW" if v["salary_status"] == "UNKNOWN" else "QUALIFIED", v["description"], v["salary_status"]])
+        if not args.raw_only and v["salary_status"] == "PASS" and v["score"] >= 70 and vid not in reviews and vid not in decisions:
             candidate_new.append([vid, v["found_at"], v["title"], v["company"], v["salary"],
                                   v["format"], v["score"], json.dumps(v["breakdown"], ensure_ascii=False),
                                   v["url"], ""])
