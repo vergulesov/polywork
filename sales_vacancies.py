@@ -92,7 +92,7 @@ def score(v, text, fmt, sal):
 
 def fetch_vacancies(session, queries, days, pages):
     """HH RSS only. No api.hh.ru calls. RSS can be truncated; report request errors."""
-    out, errors = {}, []
+    out, errors, coverage = {}, [], []
     for q in queries:
         for mode in ("remote", "chelyabinsk"):
             params = {"text": q, "search_period": days,
@@ -100,12 +100,16 @@ def fetch_vacancies(session, queries, days, pages):
                       "area": 113 if mode == "remote" else 104}
             if mode == "remote":
                 params["work_format"] = "REMOTE"
+            pages_seen = 0
+            last_page_count = 0
             for page in range(pages):
                 try:
                     r = session.get(RSS, params={**params, "page": page}, timeout=20)
                     r.raise_for_status()
                     root = ET.fromstring(r.content)
                     items = root.findall(".//item")
+                    pages_seen += 1
+                    last_page_count = len(items)
                     for item in items:
                         link = clean_html(item.findtext("link") or item.findtext("guid"))
                         match = re.search(r"/vacancy/(\d+)", link)
@@ -121,12 +125,14 @@ def fetch_vacancies(session, queries, days, pages):
                         }
                         if vid not in out or mode == "remote":
                             out[vid] = entry
-                    if not items:
+                    if not items or len(items) < 20:
                         break
                 except Exception as exc:
                     errors.append(f"{q} / {mode} / page {page}: {exc}")
                     break
-    return out, errors
+            if pages_seen == pages and last_page_count >= 20:
+                coverage.append(f"{q} / {mode}: page cap {pages} reached; more results may exist")
+    return out, errors, coverage
 
 
 def rss_salary(desc):
@@ -186,8 +192,11 @@ def worksheets():
             ws = book.worksheet(title)
         except gspread.WorksheetNotFound:
             ws = book.add_worksheet(title=title, rows=1000, cols=16)
-        if not ws.row_values(1):
-            ws.update("A1", [headers[title]])
+        existing_header = ws.row_values(1)
+        if not existing_header:
+            ws.update(range_name="A1", values=[headers[title]])
+        elif title == "SALES_RAW_V2" and len(existing_header) < len(headers[title]):
+            ws.update(range_name="N1:O1", values=[headers[title][13:15]])
         result[title] = ws
     return result
 
@@ -215,7 +224,7 @@ def main():
     queries = json.loads(CONFIG.read_text(encoding="utf-8"))
     session = requests.Session()
     session.headers.update(HEADERS)
-    found, errors = fetch_vacancies(session, queries, args.days, args.pages)
+    found, errors, coverage = fetch_vacancies(session, queries, args.days, args.pages)
     output = []
     drop = {"title": 0, "low_salary": 0, "region": 0, "hard_stop": 0}
     unknown_pay = 0
@@ -261,7 +270,7 @@ def main():
     print(json.dumps({"found_unique": len(found), "qualified_raw": len(output),
                       "candidates_70": sum(x["score"] >= 70 for x in output),
                       "unknown_salary": unknown_pay, "discarded": drop,
-                      "errors": errors[:30], "sample": output[:5] if args.write else output[:20]}, ensure_ascii=False, indent=2))
+                      "pagination_warnings": coverage[:40], "errors": errors[:30], "sample": output[:5] if args.write else output[:20]}, ensure_ascii=False, indent=2))
     if not args.write:
         print("DRY RUN: no database or spreadsheet changes.")
         return
