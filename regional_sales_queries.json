@@ -1,0 +1,170 @@
+[
+  {
+    "name": "региональный менеджер",
+    "text": "региональный менеджер по продажам",
+    "params": {
+      "area": "104",
+      "order_by": "publication_time",
+      "search_period": "3",
+      "salary": "80000",
+      "currency": "RUR",
+      "only_with_salary": "true"
+    }
+  },
+  {
+    "name": "территориальный менеджер",
+    "text": "территориальный менеджер",
+    "params": {
+      "area": "104",
+      "order_by": "publication_time",
+      "search_period": "3",
+      "salary": "80000",
+      "currency": "RUR",
+      "only_with_salary": "true"
+    }
+  },
+  {
+    "name": "торговый представитель B2B",
+    "text": "торговый представитель b2b",
+    "params": {
+      "area": "104",
+      "order_by": "publication_time",
+      "search_period": "3",
+      "salary": "80000",
+      "currency": "RUR",
+      "only_with_salary": "true"
+    }
+  },
+  {
+    "name": "менеджер продаж оборудование",
+    "text": "менеджер по продажам оборудования",
+    "params": {
+      "area": "104",
+      "order_by": "publication_time",
+      "search_period": "3",
+      "salary": "80000",
+      "currency": "RUR",
+      "only_with_salary": "true"
+    }
+  },
+  {
+    "name": "инженер по продажам",
+    "text": "инженер по продажам",
+    "params": {
+      "area": "104",
+      "order_by": "publication_time",
+      "search_period": "3",
+      "salary": "80000",
+      "currency": "RUR",
+      "only_with_salary": "true"
+    }
+  },
+  {
+    "name": "сельхозтехника",
+    "text": "менеджер по продажам сельхозтехники",
+    "params": {
+      "area": "104",
+      "order_by": "publication_time",
+      "search_period": "3",
+      "salary": "80000",
+      "currency": "RUR",
+      "only_with_salary": "true"
+    }
+  },
+  {
+    "name": "спецтехника",
+    "text": "менеджер по продажам спецтехники",
+    "params": {
+      "area": "104",
+      "order_by": "publication_time",
+      "search_period": "3",
+      "salary": "80000",
+      "currency": "RUR",
+      "only_with_salary": "true"
+    }
+  },
+  {
+    "name": "промышленное оборудование",
+    "text": "продажи промышленного оборудования",
+    "params": {
+      "area": "104",
+      "order_by": "publication_time",
+      "search_period": "3",
+      "salary": "80000",
+      "currency": "RUR",
+      "only_with_salary": "true"
+    }
+  },
+  {
+    "name": "строительные материалы",
+    "text": "менеджер по продажам строительных материалов",
+    "params": {
+      "area": "104",
+      "order_by": "publication_time",
+      "search_period": "3",
+      "salary": "80000",
+      "currency": "RUR",
+      "only_with_salary": "true"
+    }
+  },
+  {
+    "name": "технический представитель",
+    "text": "технический представитель",
+    "params": {
+      "area": "104",
+      "order_by": "publication_time",
+      "search_period": "3",
+      "salary": "80000",
+      "currency": "RUR",
+      "only_with_salary": "true"
+    }
+  },
+  {
+    "name": "оборудование для общепита",
+    "text": "продажи оборудования для общепита",
+    "params": {
+      "area": "104",
+      "order_by": "publication_time",
+      "search_period": "3",
+      "salary": "80000",
+      "currency": "RUR",
+      "only_with_salary": "true"
+    }
+  },
+  {
+    "name": "гидравлика",
+    "text": "продажи гидравлического оборудования",
+    "params": {
+      "area": "104",
+      "order_by": "publication_time",
+      "search_period": "3",
+      "salary": "80000",
+      "currency": "RUR",
+      "only_with_salary": "true"
+    }
+  },
+  {
+    "name": "электрооборудование",
+    "text": "продажи электрооборудования",
+    "params": {
+      "area": "104",
+      "order_by": "publication_time",
+      "search_period": "3",
+      "salary": "80000",
+      "currency": "RUR",
+      "only_with_salary": "true"
+    }
+  },
+  {
+    "name": "аккаунт B2B регион",
+    "text": "менеджер по работе с корпоративными клиентами",
+    "params": {
+      "area": "104",
+      "order_by": "publication_time",
+      "search_period": "3",
+      "salary": "80000",
+      "currency": "RUR",
+      "only_with_salary": "true"
+    }
+  }
+]
