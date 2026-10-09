@@ -108,7 +108,7 @@ def fetch_vacancies(session, queries, days, pages):
                     items = root.findall(".//item")
                     for item in items:
                         link = clean_html(item.findtext("link") or item.findtext("guid"))
-                        match = re.search(r"/vacancy/(\\d+)", link)
+                        match = re.search(r"/vacancy/(\d+)", link)
                         if not match:
                             continue
                         vid = match.group(1)
@@ -130,27 +130,27 @@ def fetch_vacancies(session, queries, days, pages):
 
 
 def rss_salary(desc):
-    m = re.search(r"Предполагаемый уровень месячного дохода:\\s*(.*?)(?=\\s+(?:Регион:|Создана:|Вакансия компании:)|$)", desc, re.I)
+    m = re.search(r"Предполагаемый уровень месячного дохода:\s*(.*?)(?=\s+(?:Регион:|Создана:|Вакансия компании:)|$)", desc, re.I)
     if not m:
         return None
     txt = m.group(1)
-    amounts = [int(x.replace(" ", "").replace("\\xa0", ""))
-               for x in re.findall(r"\\d[\\d \\xa0]*", txt)
-               if int(x.replace(" ", "").replace("\\xa0", "")) >= 1000]
+    amounts = [int(x.replace(" ", "").replace("\xa0", ""))
+               for x in re.findall(r"\d[\d \xa0]*", txt)
+               if int(x.replace(" ", "").replace("\xa0", "")) >= 1000]
     if not amounts or ("руб" not in txt.lower() and "₽" not in txt):
         return None
-    if re.search(r"\\bдо\\b", txt, re.I) and not re.search(r"\\bот\\b", txt, re.I):
+    if re.search(r"\bдо\b", txt, re.I) and not re.search(r"\bот\b", txt, re.I):
         return {"from": None, "to": max(amounts), "currency": "RUR"}
     return {"from": min(amounts), "to": max(amounts) if len(amounts) > 1 else None, "currency": "RUR"}
 
 
 def rss_company(desc):
-    m = re.search(r"Вакансия компании:\\s*(.*?)(?=\\s+(?:Создана:|Регион:|Предполагаемый уровень)|$)", desc)
+    m = re.search(r"Вакансия компании:\s*(.*?)(?=\s+(?:Создана:|Регион:|Предполагаемый уровень)|$)", desc)
     return m.group(1).strip() if m else ""
 
 
 def rss_region(desc):
-    m = re.search(r"Регион:\\s*(.*?)(?=\\s+(?:Предполагаемый уровень|Вакансия компании:|Создана:)|$)", desc)
+    m = re.search(r"Регион:\s*(.*?)(?=\s+(?:Предполагаемый уровень|Вакансия компании:|Создана:)|$)", desc)
     return m.group(1).strip() if m else ""
 
 
