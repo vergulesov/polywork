@@ -1,0 +1,11 @@
+[Unit]
+Description=Collect sales vacancies RSS every 30 minutes
+
+[Timer]
+OnBootSec=3min
+OnUnitInactiveSec=30min
+Persistent=true
+Unit=sales-rss.service
+
+[Install]
+WantedBy=timers.target
