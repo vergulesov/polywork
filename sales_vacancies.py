@@ -203,10 +203,13 @@ def money(s):
 def main():
     p = argparse.ArgumentParser()
     p.add_argument("--write", action="store_true", help="write dedicated SALES_* tabs and state DB")
+    p.add_argument("--raw-only", action="store_true", help="populate only SALES_RAW_V2; postpone ranking decisions")
     p.add_argument("--days", type=int, default=3)
     p.add_argument("--pages", type=int, default=2, help="pages per query and mode, max 20")
     p.add_argument("--limit", type=int, default=0, help="limit full-card retrieval (0 = unlimited)")
     args = p.parse_args()
+    if args.limit < 0:
+        p.error("limit must be >= 0")
     if not 1 <= args.days <= 30 or not 1 <= args.pages <= 20:
         p.error("days must be 1..30 and pages 1..20")
     queries = json.loads(CONFIG.read_text(encoding="utf-8"))
@@ -249,7 +252,7 @@ def main():
     output.sort(key=lambda x: (-x["score"], x["published"]))
     print(json.dumps({"found_unique": len(found), "qualified_raw": len(output),
                       "candidates_70": sum(x["score"] >= 70 for x in output),
-                      "errors": errors[:30], "sample": output[:20]}, ensure_ascii=False, indent=2))
+                      "errors": errors[:30], "sample": output[:5] if args.write else output[:20]}, ensure_ascii=False, indent=2))
     if not args.write:
         print("DRY RUN: no database or spreadsheet changes.")
         return
@@ -276,11 +279,11 @@ def main():
             raw_new.append([vid, v["found_at"], v["published"], v["title"], v["company"],
                             v["salary"], v["format"], v["score"], json.dumps(v["breakdown"], ensure_ascii=False),
                             "", v["url"], v["query"], "QUALIFIED"])
-        if v["score"] >= 70 and vid not in reviews and vid not in decisions:
+        if not args.raw_only and v["score"] >= 70 and vid not in reviews and vid not in decisions:
             candidate_new.append([vid, v["found_at"], v["title"], v["company"], v["salary"],
                                   v["format"], v["score"], json.dumps(v["breakdown"], ensure_ascii=False),
                                   v["url"], ""])
-        if decisions.get(vid) == "APPROVED" and vid not in applied:
+        if not args.raw_only and decisions.get(vid) == "APPROVED" and vid not in applied:
             apply_new.append([vid, v["title"], v["company"], v["salary"], v["score"], v["url"], "Не откликался"])
         con.execute("""INSERT INTO entries VALUES (?, ?, ?, ?, ?)
                        ON CONFLICT(hh_id) DO UPDATE SET content=excluded.content,
@@ -288,7 +291,7 @@ def main():
                     (vid, json.dumps(v, ensure_ascii=False), v["found_at"], stamp(), "heuristic-v1"))
     # Previously approved vacancies must remain in APPLY even if absent from today's search.
     for vid, decision in decisions.items():
-        if decision == "APPROVED" and vid not in applied and all(x[0] != vid for x in apply_new):
+        if not args.raw_only and decision == "APPROVED" and vid not in applied and all(x[0] != vid for x in apply_new):
             row = reviews.get(vid)
             if row and len(row) >= 9:
                 apply_new.append([vid, row[2], row[3], row[4], row[6], row[8], "Не откликался"])
