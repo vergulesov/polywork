@@ -27,13 +27,13 @@ HEADERS = ["Собрано", "Компания (RSS)", "Вакансия", "Сс
            "Город / регион (RSS)", "Дата публикации", "Запрос", "Описание (RSS)",
            "HH ID", "Статус", "Оклад от 80 — проверка", "Выезды только ЧО — проверка",
            "Продукт — проверка", "Атмосфера — проверка"]
-ID_RE = re.compile(r"/vacancy/(\\d+)")
-SALARY_RE = re.compile(r"(?:от|до)\\s*[\\d\\s\\u00a0]+\\s*(?:₽|руб|RUB)", re.I)
+ID_RE = re.compile(r"/vacancy/(\d+)")
+SALARY_RE = re.compile(r"(?:от|до)\s*[\d\s\u00a0]+\s*(?:₽|руб|RUB)", re.I)
 
 
 def clean(s):
     from html import unescape
-    return re.sub(r"\\s+", " ", re.sub(r"<[^>]*>", " ", unescape(str(s or "")))).strip()
+    return re.sub(r"\s+", " ", re.sub(r"<[^>]*>", " ", unescape(str(s or "")))).strip()
 
 
 def now():
@@ -67,7 +67,7 @@ def employer(item):
             if name:
                 return name
     desc = txt(item, "description")
-    m = re.search(r"Вакансия компании:\\s*(.+?)(?=\\s+Создана:|$)", desc, re.I)
+    m = re.search(r"Вакансия компании:\s*(.+?)(?=\s+Создана:|$)", desc, re.I)
     return m.group(1).strip() if m else ""
 
 
