@@ -72,7 +72,8 @@ def employer(item):
 
 
 def main():
-    sid, creds = os.getenv("GOOGLE_SPREADSHEET_ID"), os.getenv("GOOGLE_CREDENTIALS_PATH")
+    sid = os.getenv("REGIONAL_SALES_SPREADSHEET_ID", "1W9JGIjfaJFcZoBcqwX1oSiM6lRhel44BCvhgvCY2UZw")
+    creds = os.getenv("GOOGLE_CREDENTIALS_PATH")
     if not sid or not creds:
         raise RuntimeError("GOOGLE_SPREADSHEET_ID and GOOGLE_CREDENTIALS_PATH required")
     sh = gspread.service_account(filename=creds).open_by_key(sid)
