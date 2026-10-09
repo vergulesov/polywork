@@ -6,6 +6,6 @@ After=network-online.target
 [Service]
 Type=oneshot
 WorkingDirectory=/opt/polywork
-EnvironmentFile=-/opt/polywork/.env
+EnvironmentFile=/opt/polywork/sales-rss.env
 ExecStart=/opt/polywork/.venv/bin/python -u /opt/polywork/sales_vacancies.py --days 3 --pages 3 --write --raw-only
 TimeoutStartSec=900
