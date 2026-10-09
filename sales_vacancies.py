@@ -102,12 +102,20 @@ def fetch_vacancies(session, queries, days, pages):
                 params["work_format"] = "REMOTE"
             pages_seen = 0
             last_page_count = 0
+            page_signatures = set()
+            repeated_page = False
             for page in range(pages):
                 try:
                     r = session.get(RSS, params={**params, "page": page}, timeout=20)
                     r.raise_for_status()
                     root = ET.fromstring(r.content)
                     items = root.findall(".//item")
+                    signature = tuple((i.findtext("link") or i.findtext("guid") or "") for i in items)
+                    if signature in page_signatures and signature:
+                        repeated_page = True
+                        coverage.append(f"{q} / {mode}: RSS page {page} duplicates previous page; pagination ineffective")
+                        break
+                    page_signatures.add(signature)
                     pages_seen += 1
                     last_page_count = len(items)
                     for item in items:
@@ -130,7 +138,7 @@ def fetch_vacancies(session, queries, days, pages):
                 except Exception as exc:
                     errors.append(f"{q} / {mode} / page {page}: {exc}")
                     break
-            if pages_seen == pages and last_page_count >= 20:
+            if not repeated_page and pages_seen == pages and last_page_count >= 20:
                 coverage.append(f"{q} / {mode}: page cap {pages} reached; more results may exist")
     return out, errors, coverage
 
