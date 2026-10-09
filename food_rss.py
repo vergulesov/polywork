@@ -50,44 +50,47 @@ def fetch(session, days, pages, pause):
     found, errors, warnings = {}, [], []
     for segment, queries in QUERIES.items():
         for term in queries:
-            params = {"text": term, "area": 113, "work_format": "REMOTE",
-                      "search_period": days, "order_by": "publication_time"}
-            previous = set()
-            for page in range(pages):
-                try:
-                    response = session.get(RSS, params={**params, "page": page}, timeout=25)
-                    response.raise_for_status()
-                    root = ET.fromstring(response.content)
-                    items = root.findall(".//item")
-                    signature = tuple((it.findtext("link") or "") for it in items)
-                    if signature in previous and signature:
-                        warnings.append(f"{term}: repeated RSS page {page}; pagination stopped")
+            for mode, area in (("REMOTE_SEARCH", 113), ("CHELYABINSK_SEARCH", 104)):
+                params = {"text": term, "area": area,
+                          "search_period": days, "order_by": "publication_time"}
+                if mode == "REMOTE_SEARCH":
+                    params["work_format"] = "REMOTE"
+                previous = set()
+                for page in range(pages):
+                    try:
+                        response = session.get(RSS, params={**params, "page": page}, timeout=25)
+                        response.raise_for_status()
+                        root = ET.fromstring(response.content)
+                        items = root.findall(".//item")
+                        signature = tuple((it.findtext("link") or "") for it in items)
+                        if signature in previous and signature:
+                            warnings.append(f"{term} / {mode}: repeated RSS page {page}; pagination stopped")
+                            break
+                        previous.add(signature)
+                        for it in items:
+                            link = clean(it.findtext("link") or it.findtext("guid"))
+                            match = re.search(r"/vacancy/(\d+)", link)
+                            if not match:
+                                continue
+                            vid = match.group(1)
+                            description = clean(it.findtext("description"))
+                            title = clean(it.findtext("title"))
+                            if not POS.search(title) or BAD.search(title):
+                                continue
+                            evidence = title + " " + description + " " + term
+                            score = (3 if FOOD.search(title + " " + description) else 0) + (2 if FOOD.search(term) else 0) + (2 if re.search(r"проект|комплектац|подбор|технич", evidence, re.I) else 0)
+                            if vid not in found or score > found[vid]["score"] or (score == found[vid]["score"] and mode == "REMOTE_SEARCH"):
+                                found[vid] = {"id": vid, "title": title, "desc": description, "mode": mode,
+                                              "segment": segment, "query": term, "score": score,
+                                              "published": clean(it.findtext("pubDate"))}
+                        if len(items) < 20:
+                            break
+                        if page == pages - 1:
+                            warnings.append(f"{term}: page limit reached")
+                        time.sleep(pause)
+                    except Exception as exc:
+                        errors.append(f"{term} / {mode} page={page}: {exc}")
                         break
-                    previous.add(signature)
-                    for it in items:
-                        link = clean(it.findtext("link") or it.findtext("guid"))
-                        match = re.search(r"/vacancy/(\d+)", link)
-                        if not match:
-                            continue
-                        vid = match.group(1)
-                        description = clean(it.findtext("description"))
-                        title = clean(it.findtext("title"))
-                        if not POS.search(title) or BAD.search(title):
-                            continue
-                        evidence = title + " " + description + " " + term
-                        score = (3 if FOOD.search(title + " " + description) else 0) + (2 if FOOD.search(term) else 0) + (2 if re.search(r"проект|комплектац|подбор|технич", evidence, re.I) else 0)
-                        if vid not in found or score > found[vid]["score"]:
-                            found[vid] = {"id": vid, "title": title, "desc": description,
-                                          "segment": segment, "query": term, "score": score,
-                                          "published": clean(it.findtext("pubDate"))}
-                    if len(items) < 20:
-                        break
-                    if page == pages - 1:
-                        warnings.append(f"{term}: page limit reached")
-                    time.sleep(pause)
-                except Exception as exc:
-                    errors.append(f"{term} page={page}: {exc}")
-                    break
     return found, errors, warnings
 
 def row(v):
@@ -96,7 +99,7 @@ def row(v):
     confidence = "Профильное оборудование" if FOOD.search(v["title"] + " " + d) else "Проверить отрасль компании"
     return [v["id"], field(d,"Вакансия компании"), v["title"],
             f"https://hh.ru/vacancy/{v['id']}", field(d,"Предполагаемый уровень месячного дохода"),
-            "REMOTE_SEARCH — проверить карточку", field(d,"Регион"), v["published"],
+            v["mode"] + " — проверить карточку", field(d,"Регион"), v["published"],
             dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
             v["segment"], v["query"], v["score"], risk,
             "NEW" if confidence == "Профильное оборудование" else "CHECK_INDUSTRY", d]
@@ -117,6 +120,7 @@ def main():
     print(f"unique_candidates={len(rows)} errors={len(errors)} warnings={len(warnings)}")
     for r in rows[:30]:
         print(f"{r[11]} | {r[2]} | {r[1]} | {r[3]}")
+    print("by_mode=", {mode: sum(r[5].startswith(mode) for r in rows) for mode in ("REMOTE_SEARCH", "CHELYABINSK_SEARCH")})
     for e in errors[:15]:
         print("ERROR:", e)
     for w in warnings[:15]:
