@@ -1,0 +1,11 @@
+[Unit]
+Description=Collect Chelyabinsk regional sales vacancies hourly
+
+[Timer]
+OnBootSec=5min
+OnUnitActiveSec=1h
+Persistent=true
+Unit=regional-sales.service
+
+[Install]
+WantedBy=timers.target
