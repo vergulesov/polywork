@@ -2,6 +2,7 @@
 """HH RSS -> dedicated 'Пищевой RAW' tab. No HH API. Run: python food_rss.py --write"""
 import argparse
 import datetime as dt
+from zoneinfo import ZoneInfo
 import html
 import os
 import re
@@ -37,7 +38,7 @@ POS = re.compile(r"продаж|клиент|аккаунт|account|проект
 FOOD = re.compile(r"пищев|общепит|horeca|ресторан|столов|пекар|хлебопек|кондитер|мясоперераб|молочн|тестомес|пароконвект|кухонн|абат|abat|атеси|техно.тт|холодильн|фасовоч|упаковоч", re.I)
 BAD = re.compile(r"торговый представитель|мерчендайзер|продавец-консультант|курьер|кладовщик|повар|оператор линии|технолог пищевого производства", re.I)
 RISK = re.compile(r"холодн.{0,25}(звон|поиск|продаж)|активн.{0,25}поиск|разъездн|частые командиров|ежедневн.{0,15}выезд", re.I)
-COLUMNS = ["HH ID","Компания","Вакансия","Прямая ссылка","Зарплата","Формат (RSS)","Регион","Опубликована","Обнаружена UTC","Сегмент","Поисковый запрос","Релевантность","Риски","Статус","RSS описание"]
+COLUMNS = ["HH ID","Компания","Вакансия","Прямая ссылка","Зарплата","Формат (RSS)","Регион","Опубликована","Обнаружена (Челябинск)","Сегмент","Поисковый запрос","Релевантность","Риски","Статус","RSS описание"]
 
 def clean(s):
     return re.sub(r"\s+", " ", html.unescape(re.sub("<[^>]+>", " ", s or ""))).strip()
@@ -93,14 +94,33 @@ def fetch(session, days, pages, pause):
                         break
     return found, errors, warnings
 
+CHELYABINSK = ZoneInfo("Asia/Yekaterinburg")
+SHEETS_EPOCH = dt.datetime(1899, 12, 30)
+
+def sheet_local_datetime(value):
+    """HH publication time -> real Google Sheets datetime serial in Chelyabinsk."""
+    if not value:
+        return ""
+    try:
+        parsed = dt.datetime.fromisoformat(value.replace("Z", "+00:00"))
+        if parsed.tzinfo is None:
+            return ""
+        local = parsed.astimezone(CHELYABINSK).replace(tzinfo=None)
+        return (local - SHEETS_EPOCH).total_seconds() / 86400
+    except ValueError:
+        return ""
+
+def now_sheet_datetime():
+    return sheet_local_datetime(dt.datetime.now(dt.timezone.utc).isoformat())
+
 def row(v):
     d = v["desc"]
     risk = "Проверить холодный поиск / разъезды" if RISK.search(d + " " + v["title"]) else "Не установлено по RSS"
     confidence = "Профильное оборудование" if FOOD.search(v["title"] + " " + d) else "Проверить отрасль компании"
     return [v["id"], field(d,"Вакансия компании"), v["title"],
             f"https://hh.ru/vacancy/{v['id']}", field(d,"Предполагаемый уровень месячного дохода"),
-            v["mode"] + " — проверить карточку", field(d,"Регион"), v["published"],
-            dt.datetime.now(dt.timezone.utc).strftime("%Y-%m-%d %H:%M UTC"),
+            v["mode"] + " — проверить карточку", field(d,"Регион"), sheet_local_datetime(v["published"]),
+            now_sheet_datetime(),
             v["segment"], v["query"], v["score"], risk,
             "NEW" if confidence == "Профильное оборудование" else "CHECK_INDUSTRY", d]
 
@@ -131,6 +151,8 @@ def main():
     import gspread
     cred = os.environ.get("GOOGLE_APPLICATION_CREDENTIALS", "google-service-account.json")
     ws = gspread.service_account(filename=cred).open_by_key(SPREADSHEET_ID).worksheet(TAB)
+    ws.update_acell("I1", "Обнаружена (Челябинск)")
+    ws.format("H2:I", {"numberFormat": {"type": "DATE_TIME", "pattern": "dd.mm.yyyy hh:mm"}})
     existing = ws.col_values(1)
     if existing and existing[0] != COLUMNS[0]:
         raise RuntimeError("Unexpected sheet headers; refusing to write")
