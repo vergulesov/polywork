@@ -103,7 +103,11 @@ def main():
         time.sleep(0.4)
     now = serial(dt.datetime.now(dt.timezone.utc).isoformat())
     rows = []
+    excluded_hard = 0
     for vid, (q, title, desc, published) in seen.items():
+        if HEAVY.search(title + " " + desc) or NIGHTS.search(title + " " + desc) or SCAM.search(title + " " + desc):
+            excluded_hard += 1
+            continue
         risks = []
         if HEAVY.search(title + " " + desc):
             risks.append("Тяжести / погрузка — проверить")
@@ -117,7 +121,7 @@ def main():
                      "Есть контакт с людьми — проверить" if CONTACT.search(title + " " + desc) else "По RSS неясно",
                      "; ".join(risks) if risks else "Неясно по RSS",
                      f"https://hh.ru/vacancy/{vid}", q, "Проверить", desc])
-    print(f"unique={len(rows)} errors={len(errors)}")
+    print(f"unique={len(rows)} excluded_hard={excluded_hard} errors={len(errors)}")
     for err in errors[:20]:
         print("ERROR", err)
     if not args.write:
