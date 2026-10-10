@@ -1,0 +1,11 @@
+[Unit]
+Description=Collect packing and low-contact jobs every hour
+
+[Timer]
+OnBootSec=7min
+OnUnitInactiveSec=1h
+Persistent=true
+Unit=packing-jobs.service
+
+[Install]
+WantedBy=timers.target
