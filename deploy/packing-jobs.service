@@ -8,5 +8,5 @@ Type=oneshot
 User=root
 WorkingDirectory=/opt/polywork
 EnvironmentFile=/opt/polywork/.env
-ExecStart=/opt/polywork/.venv/bin/python -u /opt/polywork/collector_packing.py --days 3 --pages 2 --write
+ExecStart=/opt/polywork/.venv/bin/python -u /opt/polywork/collector_packing.py --days 14 --pages 5 --write
 TimeoutStartSec=900
