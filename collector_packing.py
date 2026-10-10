@@ -80,8 +80,8 @@ def get_items(session, q, days, pages):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--write", action="store_true")
-    ap.add_argument("--days", type=int, default=3)
-    ap.add_argument("--pages", type=int, default=2)
+    ap.add_argument("--days", type=int, default=14)
+    ap.add_argument("--pages", type=int, default=5)
     args = ap.parse_args()
     if not 1 <= args.days <= 30 or not 1 <= args.pages <= 20:
         ap.error("days: 1..30, pages: 1..20")
