@@ -76,10 +76,18 @@ for mode, params in [
     ("Удалёнка", {"area": "113", "work_format": "REMOTE"}),
     ("Челябинск", {"area": "104"}),
 ]:
+    # Product-first searches catch vacancies where the product is explicit.
     for product in PRODUCT_QUERIES:
         SEARCHES.append((mode, product, params))
-        for role in ROLE_PREFIXES:
-            SEARCHES.append((mode, f"{role} {product}", params))
+
+    # Broad sales-role searches are needed because some manufacturers publish
+    # generic titles/descriptions and HH RSS may omit the product wording.
+    for role in ROLE_PREFIXES:
+        SEARCHES.append((mode, role, params))
+
+    # A few targeted employer-name searches recover generic roles at key makers.
+    for employer in ["ALSO", "АЛСО", "LD", "АРМАКОМ", "УЗТА", "УралАрм", "СпецАрматура"]:
+        SEARCHES.append((mode, employer, params))
 
 
 TARGET = re.compile(
@@ -89,9 +97,16 @@ TARGET = re.compile(
     r"компенсатор.{0,12}трубопровод",
     re.I,
 )
-SALES_TITLE = re.compile(
+SALES = re.compile(
     r"менеджер|продаж|инженер.{0,12}продаж|региональн.{0,12}(?:менеджер|представител)|"
-    r"аккаунт|клиент|коммерч|сбыт|торгов.{0,12}представител",
+    r"аккаунт|клиент|коммерч|сбыт|торгов.{0,12}представител|работа с клиент",
+    re.I,
+)
+
+EMPLOYER_TARGET = re.compile(
+    r"\bALSO\b|\bАЛСО\b|групп.{0,8}компан.{0,8}LD|\bLD\b|"
+    r"АРМАКОМ|Уральск.{0,12}завод.{0,12}трубопроводн.{0,12}арматур|"
+    r"УЗТА|УралАрм|СпецАрматур",
     re.I,
 )
 FALSE_POSITIVE = re.compile(
@@ -175,10 +190,14 @@ def main():
                 text = title + " " + desc
                 if FALSE_POSITIVE.search(text):
                     continue
-                # Product can be mentioned anywhere in the RSS card, but the vacancy
-                # itself must be a sales/client-facing role. This catches generic titles
-                # like "Региональный менеджер" at valve manufacturers.
-                if not TARGET.search(text) or not SALES_TITLE.search(title):
+                employer_text = field(desc, "Вакансия компании")
+                is_sales = bool(SALES.search(title + " " + desc))
+                is_product = bool(TARGET.search(text))
+                is_target_employer = bool(EMPLOYER_TARGET.search(employer_text + " " + desc))
+
+                # Accept sales/client roles when either the product is visible in RSS
+                # OR the employer is a known valve/pipeline-equipment company.
+                if not is_sales or not (is_product or is_target_employer):
                     continue
                 if vid not in seen:
                     seen[vid] = (mode, query, title, desc, clean(item.findtext("pubDate")))
