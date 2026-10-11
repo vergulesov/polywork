@@ -103,12 +103,25 @@ SALES = re.compile(
     re.I,
 )
 
-EMPLOYER_TARGET = re.compile(
-    r"\bALSO\b|\bАЛСО\b|групп.{0,8}компан.{0,8}LD|\bLD\b|"
-    r"АРМАКОМ|Уральск.{0,12}завод.{0,12}трубопроводн.{0,12}арматур|"
-    r"УЗТА|УралАрм|СпецАрматур",
-    re.I,
-)
+FOCUSED_EMPLOYERS = {
+    "also",
+    "алсо",
+    "уральский завод трубопроводной арматуры",
+    "армаком",
+    "узта",
+    "ураларм",
+    "спецарматура",
+}
+
+DIVERSIFIED_EMPLOYERS = {
+    "группа компаний ld",
+}
+
+def employer_name(desc):
+    return field(desc, "Вакансия компании").strip()
+
+def normalize_employer(name):
+    return re.sub(r"[^a-zа-я0-9]+", " ", name.lower()).strip()
 FALSE_POSITIVE = re.compile(
     r"арматурщик|вязк.{0,8}арматур|железобетон|жби|бетонщик|монолит|"
     r"слесарь|токарь|фрезеровщик|сварщик|кладовщик|водитель|грузчик",
@@ -190,14 +203,23 @@ def main():
                 text = title + " " + desc
                 if FALSE_POSITIVE.search(text):
                     continue
-                employer_text = field(desc, "Вакансия компании")
+                employer_text = employer_name(desc)
+                employer_key = normalize_employer(employer_text)
                 is_sales = bool(SALES.search(title + " " + desc))
                 is_product = bool(TARGET.search(text))
-                is_target_employer = bool(EMPLOYER_TARGET.search(employer_text + " " + desc))
+                is_focused_employer = employer_key in FOCUSED_EMPLOYERS
+                is_diversified_employer = employer_key in DIVERSIFIED_EMPLOYERS
 
-                # Accept sales/client roles when either the product is visible in RSS
-                # OR the employer is a known valve/pipeline-equipment company.
-                if not is_sales or not (is_product or is_target_employer):
+                # Focused valve makers (e.g. ALSO, UZTA) may use generic sales titles,
+                # so sales roles from them are accepted even when RSS omits the product.
+                #
+                # Diversified groups (e.g. LD) have many unrelated product lines;
+                # for them we still require valve/pipeline product wording.
+                if not is_sales:
+                    continue
+                if not (is_product or is_focused_employer):
+                    continue
+                if is_diversified_employer and not is_product:
                     continue
                 if vid not in seen:
                     seen[vid] = (mode, query, title, desc, clean(item.findtext("pubDate")))
