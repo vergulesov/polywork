@@ -49,79 +49,38 @@ HEADERS = [
 PRODUCT_QUERIES = [
     "запорная арматура",
     "трубопроводная арматура",
-    "регулирующая арматура",
-    "промышленная арматура",
     "шаровые краны",
-    "шаровой кран",
     "клапаны",
     "задвижки",
     "дисковые затворы",
-    "вентили",
     "трубопроводное оборудование",
     "детали трубопроводов",
     "фланцы",
     "компенсаторы трубопроводов",
 ]
 
-ROLE_PREFIXES = [
-    "менеджер",
-    "инженер по продажам",
-    "региональный менеджер",
-    "менеджер по работе с клиентами",
-    "специалист по продажам",
+SEARCHES = [
+    (mode, product, params)
+    for mode, params in [
+        ("Удалёнка", {"area": "113", "work_format": "REMOTE"}),
+        ("Челябинск", {"area": "104"}),
+    ]
+    for product in PRODUCT_QUERIES
 ]
 
-SEARCHES = []
-for mode, params in [
-    ("Удалёнка", {"area": "113", "work_format": "REMOTE"}),
-    ("Челябинск", {"area": "104"}),
-]:
-    # Product-first searches catch vacancies where the product is explicit.
-    for product in PRODUCT_QUERIES:
-        SEARCHES.append((mode, product, params))
-
-    # Broad sales-role searches are needed because some manufacturers publish
-    # generic titles/descriptions and HH RSS may omit the product wording.
-    for role in ROLE_PREFIXES:
-        SEARCHES.append((mode, role, params))
-
-    # A few targeted employer-name searches recover generic roles at key makers.
-    for employer in ["ALSO", "АЛСО", "LD", "АРМАКОМ", "УЗТА", "УралАрм", "СпецАрматура"]:
-        SEARCHES.append((mode, employer, params))
-
-
-TARGET = re.compile(
-    r"запорн.{0,12}арматур|трубопроводн.{0,12}арматур|регулирующ.{0,12}арматур|"
-    r"промышленн.{0,12}арматур|шаров.{0,8}кран|клапан|задвижк|затвор|вентил|"
-    r"трубопроводн.{0,12}оборудован|детал.{0,12}трубопровод|фланц|"
-    r"компенсатор.{0,12}трубопровод",
-    re.I,
-)
-SALES = re.compile(
-    r"менеджер|продаж|инженер.{0,12}продаж|региональн.{0,12}(?:менеджер|представител)|"
-    r"аккаунт|клиент|коммерч|сбыт|торгов.{0,12}представител|работа с клиент",
+SALES_TITLE = re.compile(
+    r"менеджер|продаж|региональн.{0,12}(?:представител|менеджер)|"
+    r"инженер.{0,12}продаж|клиент|аккаунт|сбыт|проектировщик",
     re.I,
 )
 
-FOCUSED_EMPLOYERS = {
-    "also",
-    "алсо",
-    "уральский завод трубопроводной арматуры",
-    "армаком",
-    "узта",
-    "ураларм",
-    "спецарматура",
-}
-
-DIVERSIFIED_EMPLOYERS = {
-    "группа компаний ld",
-}
-
-def employer_name(desc):
-    return field(desc, "Вакансия компании").strip()
-
-def normalize_employer(name):
-    return re.sub(r"[^a-zа-я0-9]+", " ", name.lower()).strip()
+EXCLUDE_TITLE = re.compile(
+    r"конструктор|технолог|закуп|вэд|снабж|кладов|логист|"
+    r"маркетплейс|wildberries|\bwb\b|одежд|литейн|фторопласт|"
+    r"оснастк|инструмент|слесарь|токарь|фрезеровщик|сварщик|"
+    r"водитель|грузчик|оператор станк|начальник производ",
+    re.I,
+)
 FALSE_POSITIVE = re.compile(
     r"арматурщик|вязк.{0,8}арматур|железобетон|жби|бетонщик|монолит|"
     r"слесарь|токарь|фрезеровщик|сварщик|кладовщик|водитель|грузчик",
@@ -203,23 +162,12 @@ def main():
                 text = title + " " + desc
                 if FALSE_POSITIVE.search(text):
                     continue
-                employer_text = employer_name(desc)
-                employer_key = normalize_employer(employer_text)
-                is_sales = bool(SALES.search(title + " " + desc))
-                is_product = bool(TARGET.search(text))
-                is_focused_employer = employer_key in FOCUSED_EMPLOYERS
-                is_diversified_employer = employer_key in DIVERSIFIED_EMPLOYERS
-
-                # Focused valve makers (e.g. ALSO, UZTA) may use generic sales titles,
-                # so sales roles from them are accepted even when RSS omits the product.
-                #
-                # Diversified groups (e.g. LD) have many unrelated product lines;
-                # for them we still require valve/pipeline product wording.
-                if not is_sales:
+                # Search queries are already product-specific. At this stage we only
+                # keep sales/client-facing roles and remove obvious non-sales or
+                # unrelated product lines.
+                if not SALES_TITLE.search(title):
                     continue
-                if not (is_product or is_focused_employer):
-                    continue
-                if is_diversified_employer and not is_product:
+                if EXCLUDE_TITLE.search(title):
                     continue
                 if vid not in seen:
                     seen[vid] = (mode, query, title, desc, clean(item.findtext("pubDate")))
@@ -269,7 +217,7 @@ def main():
         "searches": len(SEARCHES),
         "scanned": scanned,
         "matched": len(rows),
-        "mode": "HH RSS only; remote Russia + Chelyabinsk",
+        "mode": "HH RSS product search; remote Russia + Chelyabinsk",
         "sheet": SHEET_NAME,
         "errors": errors,
     }
