@@ -1,0 +1,11 @@
+[Unit]
+Description=Collect valve and pipeline-equipment sales vacancies every hour
+
+[Timer]
+OnBootSec=11min
+OnUnitInactiveSec=1h
+Persistent=true
+Unit=valves-jobs.service
+
+[Install]
+WantedBy=timers.target
