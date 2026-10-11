@@ -46,25 +46,54 @@ HEADERS = [
     "Командировки / выезды — проверить", "Релевантность", "Описание RSS",
 ]
 
-SEARCHES = [
-    ("Удалёнка", "запорная арматура", {"area": "113", "work_format": "REMOTE"}),
-    ("Удалёнка", "трубопроводная арматура", {"area": "113", "work_format": "REMOTE"}),
-    ("Удалёнка", "регулирующая арматура", {"area": "113", "work_format": "REMOTE"}),
-    ("Удалёнка", "клапаны трубопроводные", {"area": "113", "work_format": "REMOTE"}),
-    ("Удалёнка", "инженер по продажам арматура", {"area": "113", "work_format": "REMOTE"}),
-    ("Челябинск", "запорная арматура", {"area": "104"}),
-    ("Челябинск", "трубопроводная арматура", {"area": "104"}),
-    ("Челябинск", "регулирующая арматура", {"area": "104"}),
-    ("Челябинск", "клапаны трубопроводные", {"area": "104"}),
-    ("Челябинск", "инженер по продажам арматура", {"area": "104"}),
+PRODUCT_QUERIES = [
+    "запорная арматура",
+    "трубопроводная арматура",
+    "регулирующая арматура",
+    "промышленная арматура",
+    "шаровые краны",
+    "шаровой кран",
+    "клапаны",
+    "задвижки",
+    "дисковые затворы",
+    "вентили",
+    "трубопроводное оборудование",
+    "детали трубопроводов",
+    "фланцы",
+    "компенсаторы трубопроводов",
 ]
+
+ROLE_PREFIXES = [
+    "менеджер",
+    "инженер по продажам",
+    "региональный менеджер",
+    "менеджер по работе с клиентами",
+    "специалист по продажам",
+]
+
+SEARCHES = []
+for mode, params in [
+    ("Удалёнка", {"area": "113", "work_format": "REMOTE"}),
+    ("Челябинск", {"area": "104"}),
+]:
+    for product in PRODUCT_QUERIES:
+        SEARCHES.append((mode, product, params))
+        for role in ROLE_PREFIXES:
+            SEARCHES.append((mode, f"{role} {product}", params))
+
 
 TARGET = re.compile(
     r"запорн.{0,12}арматур|трубопроводн.{0,12}арматур|регулирующ.{0,12}арматур|"
-    r"клапан|задвижк|затвор|вентил|трубопроводн.{0,12}оборудован",
+    r"промышленн.{0,12}арматур|шаров.{0,8}кран|клапан|задвижк|затвор|вентил|"
+    r"трубопроводн.{0,12}оборудован|детал.{0,12}трубопровод|фланц|"
+    r"компенсатор.{0,12}трубопровод",
     re.I,
 )
-SALES = re.compile(r"продаж|менеджер|аккаунт|клиент|коммерч|сбыт|инженер", re.I)
+SALES_TITLE = re.compile(
+    r"менеджер|продаж|инженер.{0,12}продаж|региональн.{0,12}(?:менеджер|представител)|"
+    r"аккаунт|клиент|коммерч|сбыт|торгов.{0,12}представител",
+    re.I,
+)
 FALSE_POSITIVE = re.compile(
     r"арматурщик|вязк.{0,8}арматур|железобетон|жби|бетонщик|монолит|"
     r"слесарь|токарь|фрезеровщик|сварщик|кладовщик|водитель|грузчик",
@@ -146,7 +175,10 @@ def main():
                 text = title + " " + desc
                 if FALSE_POSITIVE.search(text):
                     continue
-                if not TARGET.search(text) or not SALES.search(text):
+                # Product can be mentioned anywhere in the RSS card, but the vacancy
+                # itself must be a sales/client-facing role. This catches generic titles
+                # like "Региональный менеджер" at valve manufacturers.
+                if not TARGET.search(text) or not SALES_TITLE.search(title):
                     continue
                 if vid not in seen:
                     seen[vid] = (mode, query, title, desc, clean(item.findtext("pubDate")))
@@ -167,8 +199,12 @@ def main():
             relevance.append("трубопроводная")
         if re.search(r"регулирующ.{0,12}арматур", text, re.I):
             relevance.append("регулирующая")
+        if re.search(r"шаров.{0,8}кран", text, re.I):
+            relevance.append("шаровые краны")
         if re.search(r"клапан|задвижк|затвор|вентил", text, re.I):
             relevance.append("клапаны/задвижки")
+        if re.search(r"детал.{0,12}трубопровод|фланц|компенсатор", text, re.I):
+            relevance.append("детали трубопроводов")
         rows.append([
             vid,
             now_value,
